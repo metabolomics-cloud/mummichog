@@ -12,10 +12,10 @@ bypassing metabolite identification. The features include
 * tentative annotations
 * metabolic models for different species through plugins
 
-This is mummichog package version 2. Version 3 is under development.
+This is code branch for mummichog package version 2.7. 
+Master branch is on version 3.
 
-Please note that mummichog-server is a different package/repository.
-
+Mummichog version 2.2 was the last version using Python 2; in branch as mummichog-python2.
 
 Installation
 ------------
@@ -43,14 +43,7 @@ The porting of metabolic model is demonstrated
 
 Please note that identifier conversion is a major issue in genome scale models. Users benefit greatly from including chemical formula (neutral_formula) and molecular weight (neutral_mono_mass) in the model.
 
-
-History
--------
-
-*Python 3 is required for Mummichog version 2.3 and beyond.*
-
-*Mummichog version 2.2 was the last version using Python 2; new branch as mummichog-python2*
-
+Citation
+--------
 The initial paper on mummichog is described in Li et al. Predicting Network Activity from High Throughput Metabolomics. PLoS Computational Biology (2013); doi:10.1371/journal.pcbi.1003123. 
 
-More on [project website http://mummichog.org](http://mummichog.org).
