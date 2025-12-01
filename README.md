@@ -1,56 +1,98 @@
-Mummichog
-=========
+Mummichog 3 dev
+===============
 
 Mummichog is a Python program for analyzing data from high throughput, untargeted metabolomics.
 It leverages the organization of metabolic networks to predict functional activity directly from feature tables,
-bypassing metabolite identification. The features include
+bypassing metabolite identification. 
 
-* computing significantly enriched metabolic pathways
-* identifying significant modules in the metabolic network
-* visualization of top networks in web browser
-* visualization that also plugs into Cytoscape
-* tentative annotations
-* metabolic models for different species through plugins
+The last of version 2 is under branch mummichog-2.7.
 
-This is mummichog package version 2. Version 3 is under development.
+This is version 3 under development.
 
-Please note that mummichog-server is a different package/repository.
+Project is moved to new organization https://github.com/metabolomics-cloud, to follow examples of https://scverse.org/
+
+## Input and Output
+
+Input:
+1. User supplied features with m/z, rtime, p-value from a statistical test. If no unique feature ID is supplied, row_number will be used as ID.
+2. [Optional] Annotation table on the features. 
+3. [Optional] Metabolic model to use. Default and optional models are provided by mummichog. Default in JSON (option for web app preload). 
+
+Annotation can be from authentic standards and MS/MS. We use metDataModel to structure annotation. One can use JMS to perform annotation on a dataset. 
+
+The format of a metabolic model contains list_of_pathways, list_of_reactions and list_of_compounds. 
+We need chemical formulas of the compounds, which may not be available in a GSMM. 
+- If compound formulas are provided in a model, be sure to have correct neutral mass and not a salt format. Salts are formed in both biological systems and in mass spectrometry. We use neutral formula to calculate adducts in mass spec, which includes salts. 
+- If formulas are not provided in a model, we need to look them up via compound identifiers.
+- The compound identifiers need to align with other data. This should be taken care of in mummichog supplied models. For developers, a translation module is needed. 
+
+Some indexing and calculation on chemical formulas are involved in testing the match to metabolomic data patterns. Pathway definition may not be available in some models. "Subsystem" could be a substitute. 
+Example of model conversion in:
+- https://github.com/shuzhao-li/mummichog/blob/master/mummichog/models.py
+- https://github.com/shuzhao-li-lab/JMS/tree/main/notebooks
+
+Outpout are 
+1. Result tables and figures, result.html as ver 2.
+2. JSON strings from pathway analysis and network module analysis for programmatic use.
+
+There's a separate repository for web-based mummichog tool, which handles UI and result visualization. 
+
+## Planning
+
+1. Moved 
+
+2. New test datasets 
+
+3. Milestone 3.1: Support of N metabolic models in JSON
+
+4. Milestone 3.2: Run with new annotation formats, backward compatible and user-supplied annotation is optional
+
+Azimuth DB should be renamed Mummichog DB.
+
+Francisco and YC deployed web mummichog apps. Let's keep this as core package, with minimal dependency. 
 
 
-Installation
-------------
+---
+Old text -
 
-Mummichog can be installed using pip (pip Installs Packages), the Python package manager. The command below will install the default (version 2):
+## The mummichog suite includes
 
-    pip install mummichog
+* mummichog(3): core algorithm package for pathway/network analysis
 
-This is OS independent. To read more on [pip here](https://pip.pypa.io/en/stable/installing/#installing-with-get-pip-py).
+* cloud-mummichog: server and worker (RESTful) implementations
 
-One can also run mummichog without installing it. Direct python call on a downloaded copy can work, e.g.
+* Azimuth DB: the chemical database for biology, including metabolic models
 
-    python3 -m mummichog.main -f mummichog/tests/testdata0710.txt -o t2
+* metDataModel: data models for metabolomics, used by mummichog and Azimuth DB
 
+* mass2chem: common utilities in interpreting mass spectrometry data, annotation
 
-Use custom metabolic model
---------------------------
-
-The `-n` argument now (v2.6) takes user specified metabolic model in JSON format, e.g.
-
-    python3 -m mummichog.main -n mummichog/tests/metabolicModel_RECON3D_20210510.json -f mummichog/tests/testdata0710.txt -o t3
-
-The porting of metabolic model is demonstrated 
-[here https://github.com/shuzhao-li/Azimuth/blob/master/docs/](https://github.com/shuzhao-li/Azimuth/blob/master/docs/From-GEM-to-metDataModel-20210510.ipynb)
-
-Please note that identifier conversion is a major issue in genome scale models. Users benefit greatly from including chemical formula (neutral_formula) and molecular weight (neutral_mono_mass) in the model.
+* massBrowser: visualization using js (code reusable from CSM and mummichog web app)
 
 
-History
--------
 
-*Python 3 is required for Mummichog version 2.3 and beyond.*
 
-*Mummichog version 2.2 was the last version using Python 2; new branch as mummichog-python2*
 
-The initial paper on mummichog is described in Li et al. Predicting Network Activity from High Throughput Metabolomics. PLoS Computational Biology (2013); doi:10.1371/journal.pcbi.1003123. 
 
-More on [project website http://mummichog.org](http://mummichog.org).
+
+## set up env for development (Python3, using virtualenv on Linux)
+
+sudo apt install python3-dev python3-venv
+
+sudo pip3 install virtualenv
+
+virtualenv env
+
+source env/bin/activate
+
+A few libraries used for mummichog, for example:
+
+(env) $ pip install scipy matplotlib xlsxwriter networkx
+
+(env) $ deactivate
+
+*To run test:*
+
+shuzhao@canyon:~/li.github/mummichog3$ python3 -m mummichog.main -f mummichog/tests/testdata0710.txt -o t3
+
+

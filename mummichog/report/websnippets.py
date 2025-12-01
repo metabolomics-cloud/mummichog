@@ -68,16 +68,13 @@ HTML_HEAD = """<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "h
         </style> 
         <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
         <script src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js" charset="utf-8"></script>
-        <script src="https://shuzhao-li.github.io/mummichog.org/download/cytoscape.min.js" charset="utf-8"></script>
-        <script src="https://cdn.rawgit.com/cytoscape/cytoscape.js-spread/1.0.9/cytoscape-spread.js"></script> 
-        <script src="js/plotly-latest.min.js"></script>
-        <script src="js/plotly-graphs.js"></script>
-        <script src="js/result.js"></script>
+        <script src="http://mummichog.org/download/cytoscape.min.js" charset="utf-8"></script>
+        <script src="https://cdn.rawgit.com/cytoscape/cytoscape.js-spread/1.0.9/cytoscape-spread.js"></script>        
+
         </head> 
         <body> 
         """
-
-
+        
 HTML_END = """</body> </html> """
         
 javascript_HEAD = """
@@ -101,13 +98,6 @@ javascript_END = """
            .attr("height", 10)
            .attr("fill", function(d, i) { return color(i); });
            
-        //user input plots
-        var data = JSON.parse(alldata);
-        makeMZUserInputPlot();
-        makeRetTimeUserInputPlot();
-
-        //Pathway Bar chart plot
-        makePathwayPlot()
         
         // initial draw
         cyto_draw_figure(cytonodes[0], cytoedges[0], node_sizes[0]);
@@ -264,4 +254,6 @@ javascript_END = """
     
     </script>
     """
+
+
 

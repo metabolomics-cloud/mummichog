@@ -1,35 +1,21 @@
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-# OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-# WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-# OTHER DEALINGS IN THE SOFTWARE.
-
 '''
-Generate reports from mummichog analysis.
-a) Summary report in HTML
-b) Result tables
-c) Intermediate data
-d) Web based presentation
+Old export functions
 
-@author: Shuzhao Li, Francisco Castellanos
-With js code contributed by Andrei Todor
+Not needed in v3 web app,
+but can be optionally used in local and in Jupyter Notebook applications
+
 
 '''
 
 import os
-import shutil
 import csv
-import json
-import xlsxwriter
-import logging
-import numpy as np
 
-from . import resources
 from .websnippets import *
-from .config import VERSION, SIGNIFICANCE_CUTOFF
+
+#
+# to remove dependency from matplotlib in ver 3
+#
+import matplotlib.pyplot as plt
 
 class WebReporting:
     '''
@@ -47,8 +33,6 @@ class WebReporting:
         self.PA = PA
         self.MA = MA
         self.AN = AN
-
-        logging.info('Web reporting')
         
     def run(self):
         self.get_dict_cpd_statistic()
@@ -81,7 +65,7 @@ class WebReporting:
         
         
         vis_nodes = []
-        for g in self.web_export_networks: vis_nodes += list(g.nodes)
+        for g in self.web_export_networks: vis_nodes += g.nodes()
         self.vis_nodes = set(vis_nodes)
 
 
@@ -102,7 +86,7 @@ class WebReporting:
         return webtextList as [head, middle HTML, end]
         '''
 
-        HTML = HtmlExport(self.data, self.PA)
+        HTML = HtmlExport()
         title = 'Mummichog Report: ' + self.data.paradict['output']
         HTML.add_element(title, 'h1', '')
         
@@ -116,10 +100,7 @@ class WebReporting:
         details_userData += "We are using %d features (p < %f) as significant list. The feature level data are shown in the Manhattan plots below." %(
                                     len(self.data.input_featurelist), self.data.paradict['cutoff'] )
         HTML.add_element(details_userData, 'p', '')
-        # HTML.add_element(self.Local.inline_plot_userData_MWAS, 'div', 'inline_plot_userData_MWAS') --  Using js plots instead
-        HTML.add_element('', 'div', '', 'mz_user_input')
-        HTML.add_element('', 'div', '', 'retention_time_input')
-
+        HTML.add_element(self.Local.inline_plot_userData_MWAS, 'div', 'inline_plot_userData_MWAS')
 
         # Pathway table and figure
         HTML.add_element('Top pathways', 'h2', '')
@@ -130,8 +111,7 @@ class WebReporting:
         HTML.add_element(details_pathwayData, 'p', '')
         pathwaystablly = self.write_pathway_table()
         HTML.add_element(pathwaystablly, 'div', 'pathwaystablly')
-        # HTML.add_element(self.Local.inline_plot_pathwayBars, 'div', 'inline_plot_pathwayBars') --  Using js plots instead
-        HTML.add_element('', 'div', '', 'pathwayBarPlot')
+        HTML.add_element(self.Local.inline_plot_pathwayBars, 'div', 'inline_plot_pathwayBars')
 
         # place to insert network visusalization
         HTML.add_element('Top modules', 'h2', '')
@@ -215,7 +195,7 @@ class WebReporting:
         s, counter = '', 0
         for M in self.MA.top_modules:
             counter += 1
-            nodes = list(M.graph.nodes)
+            nodes = M.graph.nodes()
             names = [self.model.dict_cpds_def.get(x, '') for x in nodes]
             s += '<div class="moduleline">' + 'module_' + str(counter) + ", p=" + str(round(M.p_value, 5)) + ", " + str(len(nodes)) + " metabolites" + '</div>'
             s += '<div class="metabolites">' + ', '.join(names) + '</div>'
@@ -288,7 +268,7 @@ class LocalExporting:
                                  ]))
         
         
-        #print_and_loginfo("Pathway analysis report was written to \n%s (.tsv and .xlsx)" %outfile)
+        #print("Pathway analysis report was written to \n%s (.tsv and .xlsx)" %outfile)
      
 
 
@@ -304,9 +284,6 @@ class LocalExporting:
         os.mkdir(self.figuredir)
         os.mkdir(self.moduledir)
 
-        self.jsDir = os.path.join(self.rootdir, 'js')
-        os.mkdir(self.jsDir)
-
     def run(self):
         '''
         '''
@@ -317,8 +294,8 @@ class LocalExporting:
         self.writeTable_top_modules()
         
         # plot figures
-        # self.plot_userData_MWAS() commenting out as plots are available via plotly js and rendered in the client browser
-        # self.plot_pathwayBars() commenting out as plots are available via plotly js and rendered in the client browser
+        self.plot_userData_MWAS()
+        self.plot_pathwayBars()
         self.plot_pathway_model()
         self.plot_module_model()
         
@@ -326,16 +303,18 @@ class LocalExporting:
         self.export_top_modules()
         self.export_activity_network()
         self.export_cpd_attributes()
-        self.exportJsLibs()
-
-        # testing JSON output
-        self.export_json_all()
         
         
     def export_userData(self):
         '''
-        to write out user data with row_numbers,
-        to use as unique ID and help users to track data.
+        to do
+        
+        Should add this function to write out user data with row_numbers,
+        to help users to track data.
+        
+        self.ListOfMassFeatures.append( 
+                    MassFeature('row'+str(ii+1), mz, retention_time, p_value, statistic, CompoundID_from_user) )
+        
         '''
         s = "massfeature_rows\tm/z\tretention_time\tp_value\tstatistic\tCompoundID_from_user\n"
         for F in self.data.ListOfMassFeatures:
@@ -344,13 +323,16 @@ class LocalExporting:
         with open(os.path.join(self.tabledir, "userInputData.txt"), 'w') as O:
             O.write(s)
             
+            
 
     def export_EmpiricalCompounds(self):
         '''
         This exports all tri relationships.
         In ActivityNetwork, the top predicted metaolite is determined.
 
-        Output two files: empCpd to row#, row# to empCpd
+        To include the annotation model here, i.e. EmpiricalCompound.identity
+
+
         '''
         s = "EID\tmassfeature_rows\tstr_row_ion\tcompounds\tcompound_names\n"
         for E in self.mixedNetwork.ListOfEmpiricalCompounds:
@@ -360,22 +342,6 @@ class LocalExporting:
         with open(os.path.join(self.tabledir, "ListOfEmpiricalCompounds.tsv"), 'w') as O:
             O.write(s)
 
-        s = "input_row\tEID\tstr_row_ion\tcompounds\tcompound_names\tinput_row\tm/z\tretention_time\tp_value\tstatistic\tCompoundID_from_user\n"
-        for row in self.mixedNetwork.mzrows:
-            # not all input rows match to an empCpd
-            try:
-                for E in self.mixedNetwork.rowindex_to_EmpiricalCompounds[row]:
-                    names = [self.model.dict_cpds_def.get(x, '') for x in E.compounds]
-                    s += '\t'.join([row, E.EID, E.str_row_ion, ';'.join(E.compounds), '$'.join(names)]
-                        ) + '\t' + self.mixedNetwork.rowDict[row].make_str_output() + '\n'
-            except KeyError:
-                pass
-
-        with open(os.path.join(self.tabledir, "userInput_to_EmpiricalCompounds.tsv"), 'w') as O:
-            O.write(s)
-
-        with open(os.path.join(self.tabledir, 'exported_Compounds.json'), 'w', encoding='utf-8') as f:
-            json.dump(self.model.Compounds, f, ensure_ascii=False, indent=2)
     
     # export functions for pathway analysis
     def export_pathway_enrichtest(self):
@@ -412,11 +378,12 @@ class LocalExporting:
         resultstr = [
                      ['MODULE', 'p-value', 'size', 'members (name)', 'members (id)', 
                       'This module overlaps with'], ]
-        
+        counter = 0
         for M in self.MA.top_modules:
-            nodes = list(M.graph.nodes)
+            counter += 1
+            nodes = M.graph.nodes()
             names = [self.model.dict_cpds_def.get(x, '') for x in nodes]
-            resultstr.append([M.id, str(M.p_value),
+            resultstr.append(['module_' + str(counter), str(M.p_value),
                               str(len(nodes)), '$'.join(names),
                               ','.join(nodes), self.find_top_pathways(nodes),
                                ])
@@ -472,9 +439,11 @@ class LocalExporting:
         export to figures/network_modules/
         for visualizatin using CytoScape
         '''
+        counter = 0
         for M in self.MA.top_modules:
+            counter += 1
             M.export_network_txt(self.model, 
-                                 os.path.join(self.moduledir, M.id + '.txt'))
+                                 os.path.join(self.moduledir, 'module_' + str(counter) + '.txt'))
 
     def export_activity_network(self):
             self.AN.export_network_txt(self.model, 
@@ -513,87 +482,6 @@ class LocalExporting:
         out.write(s)
         out.close()
 
-    def exportJsLibs(self):
-        '''
-        To-do in v3: Should move all js visualization to separate package.
-        Difficult to copy files. os.getcwd() is a wrong way 
-        because mummichog may be installed to Python site-packages as library.
-        '''
-        package_dir = resources.__path__[0]
-        # Use os.path.join to be OS independent.
-        shutil.copyfile(os.path.join(package_dir, "plotly-graphs.js"), 
-                        os.path.join(self.jsDir, "plotly-graphs.js"))
-        shutil.copyfile(os.path.join(package_dir, "plotly-latest.min.js"), 
-                        os.path.join(self.jsDir, "plotly-latest.min.js"))
-
-    def export_json_all(self):
-        '''
-        This will be the export of all mummichog output in JSON,
-        thus enabling visualization in a separate package.
-
-        Manhattan plots are based on userData_original.
-        userData_empirialCompound is link btw user input data and theoretical metabolites.
-
-        Prototyping, will improve details [2020-04-21, SL]
-        '''
-        json_data = {
-
-            'userData_original' : [
-                {
-                    'id': M.row_number, 'mz': str(M.mz), 'retention_time': str(M.retention_time), 'p_value': str(M.p_value),
-                    'statistic': str(M.statistic), 'CompoundID_from_user': M.CompoundID_from_user,
-                } for M in self.data.ListOfMassFeatures
-            ],
-
-            'userData_empirialCompound' : [
-                {
-                    'id': E.EID,
-                    'listOfFeatures': E.listOfFeatures,     # This links to userData_original['id'], which is row_number
-                    'chosen_compounds': E.chosen_compounds,
-                    'face_compound': E.face_compound,
-                    # will add compound names, def, etc.
-                } for E in self.mixedNetwork.ListOfEmpiricalCompounds
-            ],
-
-            'meta_data' : {
-                'input_parameters': self.data.paradict,
-                'metabolic_model': self.model.version,
-                'mummichog_version': VERSION,
-                'significance_cutoff' : SIGNIFICANCE_CUTOFF
-            },
-
-            # a pathway is defined in models.metabolicPathway
-            'result_pathwayAnalysis' : [
-                {
-                    'id': P.id,
-                    'name': P.name,
-                    'pathway_p_value': P.adjusted_p,
-                    'overlap_size': P.overlap_size,
-                    'pathway_size': P.EmpSize,
-                    'overlap_EmpiricalCompounds': [E.EID for E in P.overlap_EmpiricalCompounds],
-                    'significant_compounds': [E.chosen_compounds for E in P.overlap_EmpiricalCompounds],
-                    # 'all_compounds': P.cpds,
-                } for P in self.PA.resultListOfPathways
-            ],
-
-            'result_networkModules' : [
-                {
-                    'id': M.id,
-                    'p_value': M.p_value,
-                    'members': list(M.graph.nodes), # This is on theoretical metabolites/compounds
-                    #'size' is number of members
-                    # Common names of members can be looked up, from metabolic model/metabolite definition
-                } for M in self.MA.top_modules
-            ],
-
-        }
-
-        # testing dumps
-        # with open(os.path.join(self.rootdir, "result.json"), "w") as O:
-        #    O.write(json.dumps(json_data))
-        
-        with open(os.path.join(self.jsDir, "result.js"), "w") as O:
-            O.write("var alldata = '" + json.dumps(json_data) + "';")
 
 
 class HtmlExport:
@@ -602,7 +490,7 @@ class HtmlExport:
     Serving as a skeleton to be used for export functions in AnalysisCentral.
     In future versions, this can use existing tools to convert JSON to HTML.
     '''
-    def __init__(self, data, PA):
+    def __init__(self):
         self.elements = []
         self.jsdata = ''
         
@@ -610,8 +498,6 @@ class HtmlExport:
         self.HTML_END = HTML_END
         self.javascript_HEAD = javascript_HEAD
         self.javascript_END = javascript_END
-        self.data = data
-        self.PA = PA
         
         
     def write_tag(self, s, tag, classname='', htmlid=''):
@@ -725,8 +611,6 @@ class HtmlExport:
         
         total_d3_data = 'var nodes = [ ' + nodestr + '];\n\n        var links = [' + edgestr + '];\n\n'
         total_cytoscapejs_data = '        var cytonodes = [ ' + cynodestr + '];\n\n        var cytoedges = [' + cyedgestr + '];\n\n'
-
-
         self.jsdata = total_d3_data + total_cytoscapejs_data
         
     def rescale_color(self, dict_cpd_foldchange):
@@ -760,9 +644,9 @@ class HtmlExport:
         s = ''
         for element in self.elements:
             s += element
-
+            
         return [self.HTML_HEAD, 
-                s + self.javascript_HEAD + self.jsdata + self.javascript_END,
+                s + self.javascript_HEAD + self.jsdata + self.javascript_END, 
                 self.HTML_END]
 
 
@@ -794,67 +678,5 @@ def write_yes_no_MassFeature(f):
     else:
         return "no"
 
-
 def quote(s):
     return '"'+s+'"'
-
-def flatten(inlist):
-    flattened = []
-    for t in inlist:
-        flattened.append(t[0])
-        flattened.append(t[1])
-    return flattened
-
-def draw_path(dotfile, pngfile):
-    G=pgv.AGraph(dotfile)
-    G.draw(pngfile, prog='dot')
-
-
-def make_color_dict(TF, zcolors):
-    '''
-    make a colordict {cpd:color} from m/z fold changes.
-    TF is an instance of TableFeatures
-    Take highest fc if conflict, print warning
-    '''
-        
-    mydict, fcdict = {}, makedict_cpd_foldchange(TF)
-    max_fc = max( np.std(TF.network.input_mzfcdict.values()), 1.0 )
-    for k,v in fcdict.items():
-        mydict[k] = quote(zcolors[scale_color(v, max_fc)])
-    
-    return mydict, make_colorbar(zcolors, max_fc)
-
-
-def scale_color(f, max_fc=10):
-    '''
-    Auto adjusted to user data
-    '''
-    if f < -max_fc: return 0
-    elif abs(f) < 0.001: return 5
-    elif f > max_fc: return 10
-    else: return 5 + int(5*f/max_fc)
-
-def make_colorbar(zcolors, max_fc):
-    '''
-    Make a DOT string for colorbar placement
-    subgraph colorbar {rank=source; 
-        html [shape=none, margin=0, label=<
-        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="1" CELLPADDING="4">
-        <TR>
-        <TD>-1</TD>
-        <TD BGCOLOR="#FFEE44">  </TD>
-        <TD BGCOLOR="#FFCC44">  </TD>
-        <TD BGCOLOR="#FFBB44">  </TD>
-        <TD>1</TD>
-        </TR>
-        </TABLE>>];
-        }
-    '''
-    right_label = str(round(max_fc, 2))
-    s = 'subgraph colorbar {rank=source;\n\
-            html [shape=none, margin=0, label=<\n\
-            <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="1" CELLPADDING="4"><TR>'
-    s += '<TD>-' + right_label + '</TD>'
-    for z in zcolors: s += '<TD BGCOLOR="%s">  </TD>;'%z
-    s += '<TD>' + right_label + '</TD></TR></TABLE>>];\n}\n'
-    return s

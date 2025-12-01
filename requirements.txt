@@ -1,5 +1,8 @@
-matplotlib
-networkx==1.10
+networkx
 numpy
 scipy
 xlsxwriter
+jms_metabolite_services>=0.5.8
+khipu_metabolomics
+mass2chem>=0.4.9
+metDataModel>=0.6.1

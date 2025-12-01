@@ -1,70 +1,90 @@
-#!/usr/bin/env python
-# Copyright (c) 2010-2020 Shuzhao Li.
-# All rights reserved.
+# Licensed under the BSD 3-Clause License.
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-# OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-# WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-# OTHER DEALINGS IN THE SOFTWARE.
+# mummichog - pathway and network analysis for metabolomics
+#
 
+import time
+import argparse
+import sys
+import json
+from mummichog import __version__
+from mummichog.models.get_models import get_metabolic_model
 
-'''
-mummichog 2,
-pathway and network analysis for metabolomics
+from .api import *
+from .parameters import PARAMETERS
 
-@author: Shuzhao Li
+fishlogo = '''     
+    --------------------------------------------
+    
+             oO                      ooooooooo
+           oOO   OOOOO  ooooo       ooo oooo
+     oOO   O       ooooo  oooooo ooooo
+    oooO           oooooo         oooo ooooo
+        Oooo   o      OOOOOO   oooo   oooooooo
+            ooooo  oooo      
+                 o
+    
+    --------------------------------------------
+    '''
 
-Online documentation: http://mummichog.org
-Major change in data structure from version 1. 
-Only the default metabolic model (human_model_mfn) and a worm model are ported to version 2 so far.
-This is intended to be the branch of command line version. 
-A server version is upcoming, where metabolic models are stored a separate online database.
-'''
+def build_parser():
+    parser = argparse.ArgumentParser(
+        description='mummichog v%s: pathway and network analysis for metabolomics' %__version__,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
 
+    # add arguments
+    parser.add_argument('-v', '--version', action='version', version=__version__, 
+            help='print version and exit')
+    parser.add_argument('-j', '--project', type=str,
+            help='project name')
+    parser.add_argument('-m', '--mode', type=str,
+            help='mode of ionization, pos or neg')
+    parser.add_argument('--ppm', type=int, 
+            help='mass precision in ppm (part per million), same as mz_tolerance_ppm')
+    parser.add_argument('-d', '--workdir', type=str,
+            help='working directory')
+    parser.add_argument('-i', '--infile', type=str,
+            help='input file with statistical results')
+    parser.add_argument('-a', '--annotation', type=str,
+            help='annotation file in empirical compound format (json)')
+    parser.add_argument('-o', '--output', type=str,
+            help='output directory')
+    parser.add_argument('-c', '--cutoff', type=float,
+            help='significance cutoff for features, p-value or similar metric')
 
-from .functional_analysis import *
-from .reporting import *
+    parser.add_argument('-p', '--permutation', type=int,
+            help='number of permutations to estimate null distributions')
+    
+    args = parser.parse_args()
+    return args
 
 
 def main():
     
     print (fishlogo)
-    print ( "mummichog version %s \n" %VERSION )
-    optdict = dispatcher()
-
-    print_and_loginfo("Started @ %s\n" %time.asctime())
-    userData = InputUserData(optdict)
+    print ( "mummichog version %s \n" %__version__ )
     
-    #specify which metabolic model 
-    if userData.paradict['network'] in ['human', 'hsa', 'Human', 'human_mfn', 'hsa_mfn', '']:
-        theoreticalModel = metabolicNetwork(metabolicModels[ 'human_model_mfn' ])
+    # make a copy of the default parameters; user options will override
+    parameters = PARAMETERS.copy()
 
-    elif userData.paradict['network'] in ['worm', 'C. elegans', 'icel1273', 'Caenorhabditis elegans']:
-        theoreticalModel = metabolicNetwork(metabolicModels[ 'worm_model_icel1273' ])
-    #
-    # get user specified model
-    #
-    else:
-        try:
-            theoreticalModel = metabolicNetwork(
-                # get user input JSON model and convert to mummichog format
-                read_user_json_model(userData.paradict['network'])
-            )      
-        except FileNotFoundError:
-            raise FileNotFoundError( "Not being able to find ", userData.paradict['network'] )
-        finally:
-            print("Support of custom metabolic models is in progress. Pls contact author.")
+    # build CLI parser
+    args = build_parser()
+    parameters.update(vars(args)) 
+
+    print("Started @ %s\n" %time.asctime())
+    userData = InputUserData(parameters)
+    theoreticalModel = get_metabolic_model( parameters['network'] )
     
-    # calculating isotopes/adducts, to test, print(list(theoreticalModel.Compounds.items())[64: 70])
-    theoreticalModel.update_Compounds_adducts(mode=userData.paradict['mode'])
-
-    # matching model data with user data
+    # for developer testing
+    print(
+            list(theoreticalModel.Compounds.items())[92], "...\n"
+    )
+    print(parameters)
+    
     mixedNetwork = DataMeetModel(theoreticalModel, userData)
-
+    
+    
     # getting a list of Pathway instances, with p-values, in PA.resultListOfPathways
     PA = PathwayAnalysis(mixedNetwork.model.metabolic_pathways, mixedNetwork)
     PA.cpd_enrich_test()
@@ -75,17 +95,27 @@ def main():
     
     # do activity network
     AN = ActivityNetwork( mixedNetwork, set(PA.collect_hit_Trios() + MA.collect_hit_Trios()) )
-    
-    Local = LocalExporting(mixedNetwork, PA, MA, AN)
-    Local.run()
-
-    Web = WebReporting(Local, PA, MA, AN)
-    Web.run()
-    
-    print_and_loginfo("\nFinished @ %s\n" %time.asctime())
 
 
+    print("\nFinished @ %s\n" %time.asctime())
 
+    #
+    #  This is to export data as Python objects
+    #
+    MCG_JSON = json_export_all(mixedNetwork, PA, MA, AN)
+
+    #print(MCG_JSON)
+    print("\n\n~~~~~~~~~~~~~~~~~~~~\n\n")
+
+    # Use Encoder to convert Python to JSON format 
+    s = json.JSONEncoder().encode(MCG_JSON )
+    with open("mcg_output.json", "w") as O:
+        O.write(s)
+
+    #print(json.dumps(s,  indent=4) [:500])
+    print("JSON output was written in mcg_output.json.")
+
+  
 
 #
 # -----------------------------------------------------------------------------

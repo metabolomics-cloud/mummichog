@@ -2,12 +2,19 @@
 
 from setuptools import setup, find_packages
 
+with open("asari/__init__.py") as f:
+    exec([x for x in f.readlines() if '__version__' in x][0])
+    
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+with open("requirements.txt", "r") as f:
+    requirements = f.read()
+    
+    
 setup(
   name='mummichog',
-  version='2.7.0',
+  version=__version__,
 
   author='Shuzhao Li, Francisco Castellanos, Andrei Todor',
   author_email='shuzhao.li@gmail.com',
@@ -40,12 +47,6 @@ setup(
     },
 
   python_requires='>=3.4',
-  install_requires=[
-    'matplotlib',
-    'networkx>=2',
-    'numpy',
-    'scipy',
-    'xlsxwriter',
-  ],
+  install_requires=requirements.splitlines(),
 
 )
