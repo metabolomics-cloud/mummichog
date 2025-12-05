@@ -51,6 +51,11 @@ Azimuth DB should be renamed Mummichog DB.
 
 Francisco and YC deployed web mummichog apps. Let's keep this as core package, with minimal dependency. 
 
+## Test run
+
+```
+(base) MLG-JGM467:mummichog lish$ python3 -m mummichog.main -i tests/ineurons_ttest_1127.tsv -j testneuron -a tests/empCpds_with_annotations.json -d .
+```
 
 ---
 Old text -

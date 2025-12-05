@@ -70,7 +70,9 @@ def main():
 
     # build CLI parser
     args = build_parser()
-    parameters.update(vars(args)) 
+    for k, v in vars(args).items():
+        if v is not None:           # update only those provided by user, not None
+            parameters[k] = v
 
     print("Started @ %s\n" %time.asctime())
     userData = InputUserData(parameters)

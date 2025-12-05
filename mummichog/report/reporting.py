@@ -13,6 +13,7 @@ def json_export_all(mixedNetwork, PA, MA, AN):
         'EmpiricalCompounds': mixedNetwork.to_json(),
         'pathway_analysis': PA.to_json(),     #force_ascii=True),
         'module_analysis': MA.to_json(), 
+        
         'activity_network': AN.to_json(),
     }
     

@@ -9,7 +9,8 @@ from jms.empiricalCpds import load_epds_from_json
 
 >>> from _metabolic_models import *
 >>> models.keys()
-dict_keys(['Staphylococcus_epidermidis_ATCC_12228_massInferred', 'metabolicModel_EBI_20210602_Neisseria_meningitidis_alpha14', 'metabolicModel_AGORA_20210512_Escherichia_coli_O157_H7_str_Sakai', 'metabolicModel_EBI_20210602_Propionibacterium_acnes_SK137', 'metabolicModel_az_HumanGEM_20220302_noCompartmentalization', 'worm_model_icel1273'])
+dict_keys(['Staphylococcus_epidermidis_ATCC_12228_massInferred', 'metabolicModel_EBI_20210602_Neisseria_meningitidis_alpha14', 'metabolicModel_AGORA_20210512_Escherichia_coli_O157_H7_str_Sakai', 
+'metabolicModel_EBI_20210602_Propionibacterium_acnes_SK137', 'metabolicModel_az_HumanGEM_20220302_noCompartmentalization', 'worm_model_icel1273'])
 
 >>> for m in models:
 ...   print(models[m].keys())
@@ -35,11 +36,22 @@ dict_keys(['metabolic_rxns', 'cpd_edges', 'metabolic_pathways', 'Compounds', 'di
 >>> models['metabolicModel_EBI_20210602_Neisseria_meningitidis_alpha14']['metabolic_rxns'][:2]
 [{'id': 'MNXR2184_i', 'reactants': ['bigg_fdp_i'], 'products': ['MNXM74_i', 'bigg_dhap_i']}, {'id': 'MNXR648_i', 'reactants': ['bigg_h_i', 'bigg_nadh_i', 'bigg_acald_i'], 'products': ['bigg_etoh_i', 'bigg_nad_i']}]
 
+(base) MLG-JGM467:models lish$ python3
+>>> from metabolicModels import metabolicModels
+>>> metabolicModels.keys()
+dict_keys(['human_model_mfn', 'worm_model_icel1273'])
+>>> list(metabolicModels['human_model_mfn']['Compounds'].items())[20:22]
+[('C01336', {'formula': '', 'mw': 0, 'name': 'Aryl thiol; RSH', 'adducts': {}}), ('C01335', {'formula': '', 'mw': 0, 'name': 'ROH', 'adducts': {}})]
+>>> list(metabolicModels['human_model_mfn']['Compounds'].items())[120:125]
+[('CE2441', {'formula': 'C37H54N7O17P3S', 'mw': 993.2509735655, 'name': '2E,4Z,7Z,10Z-hexadecatetraenoyl-CoA', 'adducts': {}}), ('CE2442', {'formula': 'C37H56N7O17P3S', 'mw': 995.2666236297001, 'name': '3Z,7Z,10Z-hexadecatrienoyl-CoA', 'adducts': {}}), ('CE2449', {'formula': '', 'mw': 335.222229, 'name': '11,12-dihydroxy-5(E),7(E),9(E),14(Z)-eicosatetraenoate', 'adducts': {}}), ('C15610', {'formula': '', 'mw': 402.3498, 'name': 'Cholest-5-ene-3beta,26-diol; Cholest-5-ene-3beta,27-diol; 26-Hydroxycholesterol; 27-Hydroxycholesterol', 'adducts': {}}), ('C00106', {'formula': 'C4H4N2O2', 'mw': 112.0273, 'name': 'Uracil', 'adducts': {}})]
+
+
 
 '''
 
 # import json
 import networkx as nx
+# will expand the list of models
 from .metabolicModels import metabolicModels
 
 def get_remote_metabolic_model(db=None, model_id=None):

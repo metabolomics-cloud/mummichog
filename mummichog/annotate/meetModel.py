@@ -75,7 +75,7 @@ def score_cpd_identity(empCpd):
     cpd_scores = {}
     compounds = []
     # Below is a hack; need proper cpd count & scoring function later
-    if empCpd['identity']:
+    if 'identity' in empCpd and empCpd['identity']:
         for x in empCpd['identity']:
             if len(x['compounds']) == 1:    # ignore mixtures for now
                 cpd_scores[x['compounds'][0]] = x.get('score', 0.1)
@@ -117,8 +117,8 @@ class DataMeetModel:
         # this is the sig list
         self.significant_features = self.data.input_featurelist
         # this is the reference list
-        self.features = [f['id'] for f in self.data.ListOfMassFeatures]
-        self.ListOfEmpiricalCompounds = self.List_score_EmpiricalCompounds()
+        self.features = [f['id'] for f in self.data.ListOfMassFeatures] # feature IDs
+        self.ListOfEmpiricalCompounds = self.List_score_EmpiricalCompounds() # bad name, dict
         
         self.feature_to_EmpiricalCompound, self.Compound_to_EmpiricalCompounds, \
             self.TrioList = self.index_EmpCpd_Cpd()
@@ -158,7 +158,7 @@ class DataMeetModel:
             # add new round of matching to metabolic model here
             self.augment_empCpd_with_model_cpds(empCpd)
         
-        return self.data.EmpiricalCompounds
+        return self.data.EmpiricalCompounds   # dict
 
 
     def augment_empCpd_with_model_cpds(self, empCpd):
@@ -173,11 +173,12 @@ class DataMeetModel:
         mass_tol = ppm * empCpd['neutral_formula_mass'] / 1e6
         matched_cpds = []
         #
-        # yet to sort this out
+        # yet to sort this out - to standardize cpd IDs
         #
         for cpd_id, cpd in self.model.Compounds.items():
-            if abs(cpd.neutral_formula_mass - empCpd['neutral_formula_mass']) <= mass_tol:
-                matched_cpds.append(cpd_id)
+            if cpd['mw']:  # only consider those with mw
+                if abs(cpd['mw'] - empCpd['neutral_formula_mass']) <= mass_tol:
+                    matched_cpds.append(cpd_id)
         
         # add matched_cpds to identity list with default score
         for cpd_id in matched_cpds:
@@ -203,7 +204,7 @@ class DataMeetModel:
         '''
         feature_to_EmpiricalCompounds, cpd2EmpiricalCompounds = {}, {}
         TrioList = []
-        for empCpd in self.ListOfEmpiricalCompounds:
+        for empCpd in self.ListOfEmpiricalCompounds.values():
             for feat in empCpd['MS1_pseudo_Spectra']:
                 feature_to_EmpiricalCompounds[feat['id']] = empCpd['interim_id']
             for cpd, score in empCpd['cpd_scores'].items():
@@ -216,6 +217,24 @@ class DataMeetModel:
         return feature_to_EmpiricalCompounds, cpd2EmpiricalCompounds, TrioList
 
     
+    def batch_rowindex_EmpCpd_Cpd(self, list_features):
+        
+        
+        '''
+        Batch matching from row feature to Ecpds; Use trio data structure, (M.row_number, EmpiricalCompounds, Cpd).
+        Will be used to map for both sig list and permutation lists.
+        '''
+        new = []
+        for f in list_features:
+            E = self.feature_to_EmpiricalCompound.get(f, None)
+            if E:
+                for cpd, score in self.ListOfEmpiricalCompounds[E]['cpd_scores'].items():
+                    new.append((f, E, cpd))
+            
+        return new
+    
+    
+    
     def to_json(self):
         '''
         JSON export to be consumed by downstream functions
@@ -224,16 +243,18 @@ class DataMeetModel:
 
         Will update later in accordance to 
         https://github.com/shuzhao-li/metDataModel
-
-        '''
-
+        
         empCpd2Features, empCpd2Cpds = {}, {}
         for E in self.ListOfEmpiricalCompounds:
             empCpd2Features[E.EID] = E.massfeature_rows
             empCpd2Cpds[E.EID] = E.compounds
 
+        '''
+
+        # to fix later
+
         return {
             'metabolic_model': self.model.version,
-            'empCpd2Features': empCpd2Features,
-            'empCpd2Cpds': empCpd2Cpds,
+            'empCpd2Features': self.feature_to_EmpiricalCompound, 
+            'empCpd2Cpds': self.Compound_to_EmpiricalCompounds,
         }

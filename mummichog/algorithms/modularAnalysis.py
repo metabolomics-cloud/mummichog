@@ -5,10 +5,15 @@
 #
 import sys
 import logging
+import random
+import itertools
+import numpy as np
+from scipy import stats
 import networkx as nx
 
 SEARCH_STEPS = 4
 MODULE_SIZE_LIMIT = 100
+SIGNIFICANCE_CUTOFF = 0.05   # to get from parameters later
 USE_DEBUG = False
 
 def find_communities(G, method='louvain'):
@@ -27,7 +32,133 @@ def find_communities(G, method='louvain'):
     else:
         print("Warning, method not implemented")
         
+
+
+class Mmodule:
+    '''
+    Metabolites by their connection in metabolic network.
+    A module is a subgraph, while modularity is calculated in 
+    the background of reference hsanet.
+    
+    
+    need to record sig EmpCpds
+    
+    '''
+    def __init__(self, network, subgraph, TrioList):
+        '''
+        TrioList (seeds) format: [(M.row_number, EmpiricalCompounds, Cpd), ...]
+        to keep tracking of where the EmpCpd came from (mzFeature).
         
+        network is the total parent metabolic network
+        '''
+        self.network = network
+        self.num_ref_edges = self.network.number_of_edges()
+        self.num_ref_nodes = self.network.number_of_nodes()
+        self.graph = subgraph.copy()
+        
+        seed_cpds = [x[2] for x in TrioList]
+        self.shave(seed_cpds)
+        self.nodestr = self.make_nodestr()
+        self.N_seeds = len(seed_cpds)
+        self.A = self.activity_score(seed_cpds, self.get_num_EmpCpd(TrioList))
+    
+    def activity_score(self, seed_cpds, num_EmpCpd):
+        '''
+        A * (Ns/Nm)
+        A = Newman-Girvan modularity score
+        Ns = number of input cpds in module M
+        Nm = number of total cpds in M
+        Ns/Nm can be corrected as (Ns/total input size)/(Nm/network size), however,
+        this normalization factor holds the same in permutations. 
+        Use 100 here for network size/total input size.
+        
+        To reduce bias towards larger modules in Q:
+        np.sqrt(len(seed_cpds)/Nm) * 
+        
+        Ns is now controlled by number of empiricalCompounds
+        '''
+        Ns = num_EmpCpd
+        Nm = float(self.graph.number_of_nodes())
+        if Nm > 0:
+            self.compute_modularity()
+            return np.sqrt(self.N_seeds/Nm) *self.Q * (Ns/Nm) * 100
+        else:
+            return 0
+        
+        
+    def get_num_EmpCpd(self, TrioList):
+        new = []
+        subgraph_nodes = self.graph.nodes()
+        for x in TrioList:
+            if x[2] in subgraph_nodes:
+                new.append(x[1])
+                
+        return len(set(new))
+        
+        
+    def compute_modularity(self):
+        '''
+        To compute Newman-Girvan modularity for a single module,
+        in reference to the whole network.
+        '''
+        m = self.num_ref_edges
+        Nodes = self.graph.nodes()
+        expected = 0
+        for ii in Nodes:
+            for jj in Nodes:
+                if ii != jj:
+                    expected += self.network.degree(ii) * self.network.degree(jj)
+                    
+        expected /= (4.0 * m)
+        self.Q = (self.graph.number_of_edges() - expected) / m
+    
+    def test_compute_modularity(self):
+        '''
+        Alternative modularity measure as 
+        edges in module over all edges on the same nodes
+        '''
+        m = float(self.graph.number_of_edges())
+        expected = 0
+        for ii in self.graph.nodes(): expected += self.network.degree(ii)
+        self.Q = 2 * m * (np.sqrt(self.graph.number_of_nodes())) / expected
+        
+        
+    def shave(self, seed_cpds):
+        '''
+        shave off nodes that do not connect seeds, i.e.
+        any node with degree = 1 and is not a seed, iteratively.
+        '''
+        nonseeds = [x for x in self.graph.nodes() if x not in seed_cpds]
+        excessive = [x for x in nonseeds if self.graph.degree(x)==1]
+        while excessive:
+            for x in excessive: 
+                self.graph.remove_node(x)
+            nonseeds = [x for x in self.graph.nodes() if x not in seed_cpds]
+            excessive = [x for x in nonseeds if self.graph.degree(x)==1]
+
+
+    def make_nodestr(self):
+        '''
+        create an identifier using nodes in sorted order
+        '''
+        Nodes = list(self.graph.nodes)
+        Nodes.sort()
+        return ''.join(Nodes)
+
+    def export_network_txt(self, met_model, filename):
+        '''
+        To use .txt for Cytoscape 3, no need for .sif any more.
+        Edges are strings now as switching to JSON compatible.
+        '''
+        s = 'SOURCE\tTARGET\tENZYMES\n'
+        for e in self.graph.edges():
+            s += e[0] + '\t' + e[1] + '\t' + met_model.edge2enzyme.get(','.join(sorted(e)), '') + '\n'
+        
+        out = open(filename, 'w')
+        out.write(s)
+        out.close()
+
+
         
 class ModularAnalysis:
     '''
@@ -64,7 +195,7 @@ class ModularAnalysis:
         self.paradict = mixedNetwork.data.paradict
         
         # both using row_numbers
-        self.ref_featurelist = self.mixedNetwork.mzrows
+        self.ref_featurelist = self.mixedNetwork.features
         self.significant_features = self.mixedNetwork.significant_features
         self.significant_Trios = self.mixedNetwork.TrioList
         
@@ -129,7 +260,7 @@ class ModularAnalysis:
         TrioList format: [(M.row_number, EmpiricalCompounds, Cpd), ...]
         '''
         global SEARCH_STEPS, MODULE_SIZE_LIMIT
-        seeds = [x[2] for x in TrioList]
+        seeds = [x[2] for x in TrioList]      # use cpd space
         modules, modules2, module_nodes_list = [], [], []
 
         for ii in range(SEARCH_STEPS):
@@ -144,7 +275,8 @@ class ModularAnalysis:
                 new_network = nx.from_edgelist(edges)
                 seeds = new_network.nodes()
             
-            for sub in nx.connected_component_subgraphs(new_network):
+            for sub in nx.connected_components(new_network):
+                sub = new_network.subgraph(sub)
                 if 3 < sub.number_of_nodes() < MODULE_SIZE_LIMIT:
                     M = Mmodule(self.network, sub, TrioList)
                     modules.append(M)
@@ -187,18 +319,7 @@ class ModularAnalysis:
         Only modules more than 3 nodes are considered as good small modules 
         should have been generated in 1st connecting step.
         '''
-        net = ng_network()
-        net.copy_from_graph(g)
-        return [nx.subgraph(g, x) for x in net.specsplit() if len(x) > 3]
-
-    # test alternative algorithm
-    def __split_modules_nemo__(self, g):
-        '''
-        Alternative function using NeMo algorithm for module finding.
-        Not used for now.
-        '''
-        net = nemo_network(g)
-        return [nx.subgraph(g, x) for x in net.find_modules() if len(x) > 3]
+        return [nx.subgraph(g, x) for x in find_communities(g) if len(x) > 3]
 
 
     def rank_significance(self):
@@ -254,8 +375,10 @@ class ModularAnalysis:
         new = []
         for T in self.significant_Trios:
             if T[2] in overlap_Cpds:
-                T[1].update_chosen_cpds(T[2])
-                T[1].designate_face_cpd()
+                # yet to sort this out
+                
+                # T[1].update_chosen_cpds(T[2])
+                # T[1].designate_face_cpd()
                 new.append(T)
         
         return new
@@ -273,6 +396,6 @@ class ModularAnalysis:
             L.append({
                 'p-value': M.p_value,
                 'edges': [','.join(e) for e in M.graph.edges()],
-                'nodes': M.graph.nodes()
+                'nodes': list(M.graph.nodes)
             })
         return L

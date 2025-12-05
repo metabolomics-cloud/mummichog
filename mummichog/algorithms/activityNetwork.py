@@ -72,7 +72,8 @@ class ActivityNetwork:
         '''
         connected_component_subgraphs likely to return sorted subgraphs. Just to be sure here.
         '''
-        return max(nx.connected_component_subgraphs(an), key=len)
+        connected_component_subgraphs = (an.subgraph(c) for c in nx.connected_components(an))
+        return max(connected_component_subgraphs, key=len)
         
     def __get_ave_connections__(self, N):
         '''

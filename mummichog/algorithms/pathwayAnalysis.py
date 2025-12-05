@@ -1,7 +1,19 @@
 '''
 '''
 import sys
+import random
+import numpy as np
 from scipy import stats
+
+SIGNIFICANCE_CUTOFF = 0.05   # to get from parameters later
+
+# Currency metabolites to be excluded in pathway/network analysis
+# Need to standardize IDs later
+currency = ['C00001', 'C00080', 'C00007', 'C00006', 'C00005', 'C00003',
+            'C00004', 'C00002', 'C00013', 'C00008', 'C00009', 'C00011', 
+            'G11113', '',
+            'H2O', 'H+', 'Oxygen', 'NADP+', 'NADPH', 'NAD+', 'NADH', 'ATP', 
+            'Pyrophosphate', 'ADP', 'Orthophosphate', 'CO2',]
 
 
 class metabolicPathway:
@@ -125,7 +137,9 @@ class PathwayAnalysis:
             sys.stdout.write( ' ' + str(ii + 1))
             sys.stdout.flush()
             random_Trios = self.mixedNetwork.batch_rowindex_EmpCpd_Cpd( 
-                                random.sample(self.mixedNetwork.mzrows, N) )
+                                random.sample(self.mixedNetwork.features, N) )
+            
+            
             query_EmpiricalCompounds = set([x[1] for x in random_Trios])
             self.permutation_record += (self.__calculate_p_ermutation_value__(
                 query_EmpiricalCompounds, pathways))
@@ -273,8 +287,11 @@ class PathwayAnalysis:
             # [(mzFeature, EmpiricalCompound, cpd),...]
             if T[1] in overlap_EmpiricalCompounds and T[0] in self.mixedNetwork.significant_features:
                 # this does not apply to all sig EmpCpd
-                T[1].update_chosen_cpds(T[2])
-                T[1].designate_face_cpd()
+                
+                # yet to sort this out
+                
+                # T[1].update_chosen_cpds(T[2])
+                # T[1].designate_face_cpd()
                 new.append(T)
         
         return new
@@ -286,6 +303,8 @@ class PathwayAnalysis:
         dict from cpd to empCpd:
         self.Compounds_to_EmpiricalCompounds - needs to clean up for pathway specific
         # 'dicts_cpd2empCpd': self.Compounds_to_EmpiricalCompounds,
+        
+        mixedNetwork
 
         dicts_cpd2empCpd = []
         for P in self.resultListOfPathways:
@@ -303,7 +322,11 @@ class PathwayAnalysis:
                 'overlap_size': P.overlap_size,
                 'pathway_size': P.EmpSize,
                 'p-value': P.adjusted_p ,
-                'significant_empCpds': [ E.EID for E in P.overlap_EmpiricalCompounds],
-                'significant_compounds': [";".join(E.chosen_compounds) for E in P.overlap_EmpiricalCompounds],
+                'significant_empCpds': list(P.overlap_EmpiricalCompounds), # [ E.EID for E in ],
+                #
+                # yet to sort out
+                #
+                'significant_compounds': [ x for x in P.overlap_features ],
+                    #[";".join(E.chosen_compounds) for E in P.overlap_EmpiricalCompounds],
             })
         return L
