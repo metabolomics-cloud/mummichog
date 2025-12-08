@@ -1,65 +1,5 @@
 '''
 
-0) JMS converts a JSON metabolic model to metabolicModels
-
-1) JMS treats a metabolic model as a database, via KCD
-2) JMS converts a list of features to empCpds in EED
-3) return EED.dict_empCpds
-
-
-from jms.modelConvert import convert_json_model
-from jms.empiricalCpds import load_epds_from_json
-
-
-# jms-metabolite-services
-from jms.dbStructures import knownCompoundDatabase, ExperimentalEcpdDatabase
-
-from .parameters import adduct_search_patterns, \
-                                adduct_search_patterns_neg, \
-                                    isotope_search_patterns, \
-                                        extended_adducts
-
-
-        EED = ExperimentalEcpdDatabase(mode=self.mode, mz_tolerance_ppm=self.mz_tolerance_ppm, rt_tolerance=2)
-        # passing patterns from .defaul_parameters
-        if self.mode == 'pos':
-            EED.adduct_patterns = adduct_search_patterns
-        else:
-            EED.adduct_patterns = adduct_search_patterns_neg
-        EED.isotope_search_patterns = isotope_search_patterns
-        EED.extended_adducts = extended_adducts
-
-        EED.build_from_list_peaks(self.CMAP.FeatureList)
-        EED.extend_empCpd_annotation(self.KCD)
-        EED.annotate_singletons(self.KCD)       
-        # EED.dict_empCpds misses some features 
-        EED.dict_empCpds = self.append_orphans_to_epmCpds(EED.dict_empCpds)
-
-
- [{'feature': {'rtime': 25.07, 'mz': 85.0647, 'id': 'F45'},
-   'lib': [{'id': 'row199',
-     'name': 'Cyclopentanone',
-     'mz': 85.064791478,
-     'rtime': 26.4}],
-   'ms2': {},
-   'csm': {}},
-  {'feature': {'rtime': 191.32, 'mz': 85.0884, 'id': 'F65'},
-   'lib': [],
-   'ms2': {},
-   'csm': {'name': 'piperidino',
-    'mz': 85.0884,
-    'rtime': 191.32,
-    'ion_relation': nan,
-    'empCpd_id': nan}},
-  {'feature': {'rtime': 24.02, 'mz': 85.101, 'id': 'F66'},
-   'lib': [],
-   'ms2': {},
-   'csm': {'name': 'Cyclohexane',
-    'mz': 85.101,
-    'rtime': 24.02,
-    'ion_relation': nan,
-    'empCpd_id': nan}}]
-    
     
 '''
 
@@ -68,20 +8,15 @@ import os
 import logging
 MASS_RANGE = (50, 2000)
 RETENTION_TIME_TOLERANCE_FRAC = 0.02    
-# from mass2chem.adducts import *
 
-
-#
-# this should be based on Experiment class, and organize by peaks - features - empCpds
-#
 
 class InputUserData:
     '''
     
-    Changing in v3
-    need to field 
+    Need to field 
     JSON list of features and list of epds
-
+    
+    User annotation if provided
 
     '''
     
@@ -92,7 +27,7 @@ class InputUserData:
         self.web = web
         self.paradict = paradict
         self.header_fields = []
-        self.ListOfMassFeatures = [] # MassFeatures are legacy name; they are just features
+        self.ListOfUserFeatures = []
         self.input_featurelist = []
 
         # entry point of data input
@@ -102,12 +37,15 @@ class InputUserData:
     def update(self):
         '''
         Update retention_time_rank and is_significant to all MassFeatures
+        
+        Get user supplied JSON annotation if provided.
+        
         '''
-        retention_times = [M['rtime'] for M in self.ListOfMassFeatures]
+        retention_times = [M['rtime'] for M in self.ListOfUserFeatures]
         self.max_retention_time = max(retention_times)
 
-        self.max_mz = max([M['mz'] for M in self.ListOfMassFeatures])
-        self.determine_significant_list(self.ListOfMassFeatures)
+        self.max_mz = max([M['mz'] for M in self.ListOfUserFeatures])
+        self.determine_significant_list(self.ListOfUserFeatures)
         
         if 'annotation' in self.paradict and self.paradict['annotation']:
             # load empirical compound annotation from JSON file
@@ -122,7 +60,7 @@ class InputUserData:
             self.EmpiricalCompounds = {}
         
         
-    def text_to_ListOfMassFeatures(self, textValue, delimiter='\t'):
+    def text_to_ListOfUserFeatures(self, textValue, delimiter='\t'):
         '''
         Column order is hard coded for now, as mz, retention_time, p_value, statistic, CompoundID_from_user
 
@@ -156,7 +94,7 @@ class InputUserData:
                         'pval': p_value,
                         'statistic': statistic,
                         }
-                self.ListOfMassFeatures.append( 
+                self.ListOfUserFeatures.append( 
                     peak
                     )
             else:
@@ -180,17 +118,17 @@ class InputUserData:
 
     def read(self):
         '''
-        Read input feature lists to ListOfMassFeatures. 
+        Read input feature lists to ListOfUserFeatures. 
         Row_numbers (rowii+1) are used as primary ID.
         # not using readlines() to avoid problem in processing some Mac files
         '''
         if self.web:
-            self.text_to_ListOfMassFeatures(self.paradict['datatext'])
+            self.text_to_ListOfUserFeatures(self.paradict['datatext'])
         else:
-            self.text_to_ListOfMassFeatures( 
+            self.text_to_ListOfUserFeatures( 
                 open(os.path.join(self.paradict['workdir'], self.paradict['infile'])).read() )
 
-        print("Read %d features as reference list." %len(self.ListOfMassFeatures))
+        print("Read %d features as reference list." %len(self.ListOfUserFeatures))
     
     
     # more work?
@@ -235,13 +173,13 @@ class InputUserData:
             print("Automatically choosing (p < %f) as significant cutoff."  %self.paradict['cutoff'])  
         
         # mark MassFeature significant
-        for f in self.ListOfMassFeatures:
+        for f in self.ListOfUserFeatures:
             if f['pval'] < self.paradict['cutoff']:
                 f['is_significant'] = True
             else:
                 f['is_significant'] = False
         
-        self.input_featurelist = [f['fid_from_user'] for f in self.ListOfMassFeatures if f['is_significant']]
+        self.input_featurelist = [f['fid_from_user'] for f in self.ListOfUserFeatures if f['is_significant']]
         print("Using %d features (p < %f) as significant list." 
                               %(len(self.input_featurelist), self.paradict['cutoff']))  
 

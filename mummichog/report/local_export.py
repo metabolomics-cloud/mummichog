@@ -335,7 +335,7 @@ class LocalExporting:
 
         '''
         s = "EID\tmassfeature_rows\tstr_row_ion\tcompounds\tcompound_names\n"
-        for E in self.mixedNetwork.ListOfEmpiricalCompounds:
+        for E in self.mixedNetwork.DictOfEmpiricalCompounds.values():
             names = [self.model.dict_cpds_def.get(x, '') for x in E.compounds]
             s += '\t'.join([E.EID, ';'.join(E.massfeature_rows), E.str_row_ion, ';'.join(E.compounds), '$'.join(names)]
                 ) + '\n'

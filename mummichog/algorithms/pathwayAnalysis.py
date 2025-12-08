@@ -86,8 +86,8 @@ class PathwayAnalysis:
         self.TrioList = self.mixedNetwork.TrioList
         self.significant_EmpiricalCompounds = set([x[1] for x in self.TrioList])
         
-        self.ListOfEmpiricalCompounds = mixedNetwork.ListOfEmpiricalCompounds
-        self.total_number_EmpiricalCompounds = len(self.ListOfEmpiricalCompounds)
+        self.DictOfEmpiricalCompounds = mixedNetwork.DictOfEmpiricalCompounds
+        self.total_number_EmpiricalCompounds = len(self.DictOfEmpiricalCompounds)
 
         print("\nPathway Analysis...")
         

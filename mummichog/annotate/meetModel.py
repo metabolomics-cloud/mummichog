@@ -113,18 +113,18 @@ class DataMeetModel:
         '''
         self.model = metabolicModel
         self.data = userData
-        self.rowDict = {f['id']: f for f in self.data.ListOfMassFeatures}
+        self.rowDict = {f['id']: f for f in self.data.ListOfUserFeatures}
         # this is the sig list
         self.significant_features = self.data.input_featurelist
         # this is the reference list
-        self.features = [f['id'] for f in self.data.ListOfMassFeatures] # feature IDs
-        self.ListOfEmpiricalCompounds = self.List_score_EmpiricalCompounds() # bad name, dict
+        self.features = [f['id'] for f in self.data.ListOfUserFeatures] # feature IDs
+        self.DictOfEmpiricalCompounds = self.get_score_EmpiricalCompounds() 
         
         self.feature_to_EmpiricalCompound, self.Compound_to_EmpiricalCompounds, \
             self.TrioList = self.index_EmpCpd_Cpd()
 
             
-    def List_score_EmpiricalCompounds(self):
+    def get_score_EmpiricalCompounds(self):
         '''
         EmpiricalCompounds should be already constructed in userData. 
         If not, do it here.
@@ -190,10 +190,10 @@ class DataMeetModel:
         '''
         mapping from feature row index to EmpiricalCompounds and Compounds.
         
-        self.ListOfEmpiricalCompounds may contain more features than self.features.
+        self.DictOfEmpiricalCompounds may contain more features than self.features.
         Only those in self.features are used to build TrioList.
         
-        Cpd IDs have to be consistent with those in metabolic model (self.get_ListOfEmpiricalCompounds).
+        Cpd IDs have to be consistent with those in metabolic model (self.get_DictOfEmpiricalCompounds).
         Singletons are matched to model as M+H+ or M-H-.
         
         Return:
@@ -204,7 +204,7 @@ class DataMeetModel:
         '''
         feature_to_EmpiricalCompounds, cpd2EmpiricalCompounds = {}, {}
         TrioList = []
-        for empCpd in self.ListOfEmpiricalCompounds.values():
+        for empCpd in self.DictOfEmpiricalCompounds.values():
             for feat in empCpd['MS1_pseudo_Spectra']:
                 feature_to_EmpiricalCompounds[feat['id']] = empCpd['interim_id']
             for cpd, score in empCpd['cpd_scores'].items():
@@ -228,7 +228,7 @@ class DataMeetModel:
         for f in list_features:
             E = self.feature_to_EmpiricalCompound.get(f, None)
             if E:
-                for cpd, score in self.ListOfEmpiricalCompounds[E]['cpd_scores'].items():
+                for cpd, score in self.DictOfEmpiricalCompounds[E]['cpd_scores'].items():
                     new.append((f, E, cpd))
             
         return new
@@ -239,15 +239,9 @@ class DataMeetModel:
         '''
         JSON export to be consumed by downstream functions
 
-        empCpd2Cpds = {empCpd: (), ...,}
-
         Will update later in accordance to 
         https://github.com/shuzhao-li/metDataModel
         
-        empCpd2Features, empCpd2Cpds = {}, {}
-        for E in self.ListOfEmpiricalCompounds:
-            empCpd2Features[E.EID] = E.massfeature_rows
-            empCpd2Cpds[E.EID] = E.compounds
 
         '''
 

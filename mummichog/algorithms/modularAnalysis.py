@@ -185,7 +185,7 @@ class ModularAnalysis:
     '''
     def __init__(self, mixedNetwork):
         '''
-        mapping btw (mzfeature, cpd) has to be via ListOfEmpiricalCompounds, 
+        mapping btw (mzfeature, cpd) has to be via EmpiricalCompounds, 
         so that cpd can be tracked back to EmpiricalCompounds
         
         
